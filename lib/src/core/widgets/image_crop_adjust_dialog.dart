@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/den_colors.dart';
@@ -21,9 +21,18 @@ class ImageCropAdjustDialog extends StatefulWidget {
 }
 
 class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
-  final TransformationController _transformController = TransformationController();
+  final TransformationController _transformController =
+      TransformationController();
+  late final Future<Uint8List> _imageBytes;
   double _rotation = 0;
-  double _selectedAspectRatio = 0; // 0 = Free / Natural, 1.0 = Square, 4/5 = Portrait
+  double _selectedAspectRatio =
+      0; // 0 = Free / Natural, 1.0 = Square, 4/5 = Portrait
+
+  @override
+  void initState() {
+    super.initState();
+    _imageBytes = widget.imageFile.readAsBytes();
+  }
 
   @override
   void dispose() {
@@ -48,7 +57,10 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -80,7 +92,10 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
               // Aspect Ratio Pills Bar
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Row(
                   children: [
                     _buildAspectChip('Full / Free', 0),
@@ -114,11 +129,33 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
                           maxScale: 6.0,
                           boundaryMargin: const EdgeInsets.all(120),
                           child: Center(
-                            child: Image.file(
-                              File(widget.imageFile.path),
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 48)),
+                            child: FutureBuilder<Uint8List>(
+                              future: _imageBytes,
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  return const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white54,
+                                    size: 48,
+                                  );
+                                }
+                                final bytes = snapshot.data;
+                                if (bytes == null) {
+                                  return const CircularProgressIndicator(
+                                    color: Colors.white70,
+                                  );
+                                }
+                                return Image.memory(
+                                  bytes,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(
+                                        Icons.broken_image,
+                                        color: Colors.white54,
+                                        size: 48,
+                                      ),
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -132,7 +169,12 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
                                 child: Container(
                                   margin: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1.5),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                      width: 1.5,
+                                    ),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: _buildGridLines(),
@@ -141,7 +183,10 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
                             : Container(
                                 margin: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.2),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                    width: 1.2,
+                                  ),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: _buildGridLines(),
@@ -199,7 +244,10 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
                         ),
                         child: const Text(
                           'Done / Use Photo',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
@@ -248,26 +296,118 @@ class _ImageCropAdjustDialogState extends State<ImageCropAdjustDialog> {
         Expanded(
           child: Row(
             children: [
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)), bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)), bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
         Expanded(
           child: Row(
             children: [
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)), bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)), bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
         Expanded(
           child: Row(
             children: [
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
-              Expanded(child: Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.2)))))),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Expanded(child: Container()),
             ],
           ),

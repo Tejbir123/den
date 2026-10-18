@@ -3,8 +3,11 @@ import 'dart:io';
 
 import 'package:den_backend/config/database.dart';
 import 'package:den_backend/config/env.dart';
+import 'package:den_backend/middleware/cors_middleware.dart';
 import 'package:den_backend/modules/auth/auth_controller.dart';
 import 'package:den_backend/modules/auth/auth_service.dart';
+import 'package:den_backend/modules/onboarding/face_verification_controller.dart';
+import 'package:den_backend/modules/onboarding/face_verification_service.dart';
 import 'package:den_backend/modules/user/user_controller.dart';
 import 'package:den_backend/modules/user/user_service.dart';
 import 'package:den_backend/shared/aws/face_verification_service.dart';
@@ -13,23 +16,26 @@ import 'package:den_backend/shared/aws/sms_sender.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
-void main() async {
+
+void main() async {
   Env.load();
 
   // Initialize Database Pool
   await Database.initialize();
 
   // Dependency Injection: AWS Interfaces & Stub Implementations
-  final SmsSender smsSender = Env.isProduction 
+  final SmsSender smsSender = Env.isProduction
       ? throw UnimplementedError('Production SmsSender not yet implemented.')
       : ConsoleSmsSender();
-  
+
   final PhotoStorage photoStorage = Env.isProduction
       ? throw UnimplementedError('Production PhotoStorage not yet implemented.')
       : LocalPhotoStorage();
-      
+
   final FaceVerificationService faceVerificationService = Env.isProduction
-      ? throw UnimplementedError('Production FaceVerificationService not yet implemented.')
+      ? throw UnimplementedError(
+          'Production FaceVerificationService not yet implemented.',
+        )
       : StubFaceVerificationService();
 
   // Instantiate Modules
@@ -37,6 +43,11 @@ import 'package:shelf_router/shelf_router.dart';
   final authController = AuthController(authService: authService);
   final userService = UserService();
   final userController = UserController(userService: userService);
+  final faceVerificationController = FaceVerificationController(
+    service: OnboardingFaceVerificationService(
+      provider: faceVerificationService,
+    ),
+  );
 
   final app = Router();
 
@@ -59,12 +70,18 @@ import 'package:shelf_router/shelf_router.dart';
   // Mount Auth Router
   app.mount('/api/auth', authController.router.call);
   app.mount('/api/users', userController.router.call);
+  app.mount('/api/onboarding', faceVerificationController.router.call);
 
   final handler = const Pipeline()
+      .addMiddleware(corsMiddleware(allowedOrigins: Env.allowedOrigins))
       .addMiddleware(logRequests())
       .addHandler(app.call);
 
   final server = await io.serve(handler, InternetAddress.anyIPv4, Env.port);
-  print('DEN Backend Server running on http://${server.address.host}:${server.port}');
-  print('AWS Stubs wired: ${smsSender.runtimeType}, ${photoStorage.runtimeType}, ${faceVerificationService.runtimeType}');
+  print(
+    'DEN Backend Server running on http://${server.address.host}:${server.port}',
+  );
+  print(
+    'AWS Stubs wired: ${smsSender.runtimeType}, ${photoStorage.runtimeType}, ${faceVerificationService.runtimeType}',
+  );
 }

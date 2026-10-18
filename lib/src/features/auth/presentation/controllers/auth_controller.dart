@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/auth_api_repository.dart';
@@ -24,7 +25,8 @@ class AuthFlowState {
     this.error,
   });
 
-  String get fullPhoneNumber => '$countryCode${phone.replaceAll(RegExp(r'\D'), '')}';
+  String get fullPhoneNumber =>
+      '$countryCode${phone.replaceAll(RegExp(r'\D'), '')}';
 
   AuthFlowState copyWith({
     String? countryCode,
@@ -84,7 +86,9 @@ class AuthFlowNotifier extends Notifier<AuthFlowState> {
     final digits = state.phone.replaceAll(RegExp(r'\D'), '');
     if (state.countryCode == '+91') {
       if (digits.length != 10) {
-        state = state.copyWith(error: 'Please enter a valid 10-digit mobile number.');
+        state = state.copyWith(
+          error: 'Please enter a valid 10-digit mobile number.',
+        );
         return false;
       }
     } else {
@@ -101,7 +105,10 @@ class AuthFlowNotifier extends Notifier<AuthFlowState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        error: 'Failed to send OTP: ${e.toString()}',
+        error: _apiErrorMessage(
+          e,
+          fallback: 'Failed to send OTP. Please try again.',
+        ),
       );
       return false;
     }
@@ -136,23 +143,31 @@ class AuthFlowNotifier extends Notifier<AuthFlowState> {
       );
       return result;
     } catch (e) {
-      String errorMessage = 'Invalid or expired verification code.';
-      final raw = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-      if (raw.isNotEmpty) {
-        errorMessage = raw;
-      }
       state = state.copyWith(
         isSubmitting: false,
-        error: errorMessage,
+        error: _apiErrorMessage(
+          e,
+          fallback: 'Invalid or expired verification code.',
+        ),
       );
       return null;
     }
   }
 
-  void resendOtp() {
+  Future<void> resendOtp() async {
     if (state.timerSeconds > 0) return;
-    state = state.copyWith(timerSeconds: 30, error: null);
-    _startTimer();
+    await sendOtp();
+  }
+
+  String _apiErrorMessage(Object error, {required String fallback}) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] is String) {
+        final message = (data['message'] as String).trim();
+        if (message.isNotEmpty) return message;
+      }
+    }
+    return fallback;
   }
 
   void _startTimer() {
@@ -168,4 +183,6 @@ class AuthFlowNotifier extends Notifier<AuthFlowState> {
   }
 }
 
-final authFlowProvider = NotifierProvider<AuthFlowNotifier, AuthFlowState>(AuthFlowNotifier.new);
+final authFlowProvider = NotifierProvider<AuthFlowNotifier, AuthFlowState>(
+  AuthFlowNotifier.new,
+);

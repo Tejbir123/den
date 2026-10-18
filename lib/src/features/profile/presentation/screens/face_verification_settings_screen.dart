@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app.dart';
 import '../../../../core/widgets/mobile_device_shell.dart';
 import '../../../profile/application/profile_controller.dart';
 import '../../../onboarding/data/repositories/face_verification_repository_impl.dart';
@@ -14,13 +15,23 @@ class FaceVerificationSettingsScreen extends ConsumerStatefulWidget {
       _FaceVerificationSettingsScreenState();
 }
 
-class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificationSettingsScreen> {
-  final FaceVerificationRepositoryImpl _repository = FaceVerificationRepositoryImpl();
+class _FaceVerificationSettingsScreenState
+    extends ConsumerState<FaceVerificationSettingsScreen> {
+  final FaceVerificationRepositoryImpl _repository =
+      FaceVerificationRepositoryImpl();
   bool _isLoading = false;
   String? _statusMessage;
   String? _errorMessage;
 
   Future<void> _startVerification() async {
+    final sessionToken = ref.read(authStateProvider).sessionToken;
+    if (sessionToken == null || sessionToken.isEmpty) {
+      setState(() {
+        _errorMessage = 'Session expired. Please log in again.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _statusMessage = null;
@@ -28,24 +39,32 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
     });
 
     try {
-      final sessionId = await _repository.createLivenessSession();
-      final isLive = await _repository.verifyFace(sessionId: sessionId);
+      final sessionId = await _repository.createLivenessSession(
+        sessionToken: sessionToken,
+      );
+      final outcome = await _repository.verifyFace(
+        sessionId: sessionId,
+        sessionToken: sessionToken,
+      );
       if (!mounted) return;
-      if (isLive) {
+      if (outcome.isLive) {
         ref.read(profileStateProvider.notifier).updateFaceVerification(true);
         setState(() {
           _statusMessage = 'Face verification completed successfully.';
         });
       } else {
         setState(() {
-          _errorMessage = 'Face verification did not pass.';
+          _errorMessage = outcome.message.isEmpty
+              ? 'Face verification did not pass.'
+              : outcome.message;
         });
       }
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'Verification could not start because the backend is unavailable: ${error.toString()}';
+        _errorMessage = error is FaceVerificationApiException
+            ? error.message
+            : 'Face verification is currently unavailable. Please try again later.';
       });
     } finally {
       if (mounted) {
@@ -84,7 +103,11 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
                     const SizedBox(width: 4),
                     const Text(
                       'Face verification',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.black),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                      ),
                     ),
                   ],
                 ),
@@ -111,15 +134,21 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
                                     color: const Color(0xFF3E2723),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  child: const Icon(Icons.face_retouching_natural, color: Colors.white),
+                                  child: const Icon(
+                                    Icons.face_retouching_natural,
+                                    color: Colors.white,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        profile.isFaceVerified ? 'Verified' : 'Not verified yet',
+                                        profile.isFaceVerified
+                                            ? 'Verified'
+                                            : 'Not verified yet',
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w800,
@@ -129,7 +158,11 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
                                       const SizedBox(height: 4),
                                       const Text(
                                         'Users can finish this later from settings if they skipped onboarding.',
-                                        style: TextStyle(fontSize: 12, color: Color(0xFF6D6D6D), height: 1.35),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6D6D6D),
+                                          height: 1.35,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -150,7 +183,9 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
                               width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _startVerification,
+                                onPressed: _isLoading
+                                    ? null
+                                    : _startVerification,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF3E2723),
                                   foregroundColor: Colors.white,
@@ -180,7 +215,9 @@ class _FaceVerificationSettingsScreenState extends ConsumerState<FaceVerificatio
                                       },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.black87,
-                                  side: const BorderSide(color: Color(0xFFE0E0E0)),
+                                  side: const BorderSide(
+                                    color: Color(0xFFE0E0E0),
+                                  ),
                                   shape: const StadiumBorder(),
                                 ),
                                 child: const Text('Back to settings'),
